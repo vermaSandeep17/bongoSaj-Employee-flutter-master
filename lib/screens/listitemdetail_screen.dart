@@ -1,5 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:shopify_firebse/model/order_list_model.dart';
 import 'package:shopify_firebse/responce/get_model_orderList.dart';
 import 'package:shopify_firebse/utils/Constants.dart';
 import 'package:shopify_firebse/utils/SharePreferenceUtils.dart';
@@ -9,7 +10,7 @@ class ListItemDetailScreen extends StatefulWidget {
   ListItemDetailScreen({required this.orderData, required this.orderKey});
   static const routeName = '/order-details';
 
-  final Orders orderData;
+  final OrderItem orderData;
   final String orderKey;
 
   @override
@@ -31,6 +32,15 @@ class _ListItemDetailScreenState extends State<ListItemDetailScreen> {
     super.initState();
     _getUserid();
     _readDB();
+    if (widget.orderData.call1Note != '') {
+      _showDropdown1 = false;
+    }
+    if (widget.orderData.call2Note != '') {
+      _showDropdown2 = false;
+    }
+    if (widget.orderData.call3Note != '') {
+      _showDropdown3 = false;
+    }
   }
 
   _getUserid() async {
@@ -153,8 +163,8 @@ class _ListItemDetailScreenState extends State<ListItemDetailScreen> {
                                     },
                                     icon: Icon(
                                       Icons.phone,
-                                      color: Theme.of(context).primaryColor,
-                                      size: 16,
+                                      color: Colors.green,
+                                      size: 30,
                                     ),
                                   ),
                                 ],

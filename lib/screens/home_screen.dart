@@ -2,6 +2,7 @@ import 'package:firebase_database/ui/firebase_animated_list.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:shopify_firebse/login/login_screen.dart';
+import 'package:shopify_firebse/model/order_list_model.dart';
 import 'package:shopify_firebse/responce/get_model_orderList.dart';
 import 'package:shopify_firebse/screens/listitemdetail_screen.dart';
 import 'package:shopify_firebse/utils/SharePreferenceUtils.dart';
@@ -14,8 +15,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    // TODO: implement initState
+    _readDB();
+    super.initState();
+  }
+
   final databaseRef = FirebaseDatabase.instance.ref().child('orderlist');
   final TextEditingController _controllerSearch = TextEditingController();
+
+  late Orders orders;
+  OrderList orderList = OrderList();
 
   bool _showOnly = false;
   Query getOrderListQuery() {
@@ -32,6 +43,96 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future getOrderListDetails() async {
     return databaseRef;
+  }
+
+  List<OrderItem> orderItemList = [];
+
+  bool _isGetData = true;
+
+  _readDB() {
+    if (_showOnly) {
+      FirebaseDatabase.instance
+          .ref('orderlist')
+          .child(_controllerSearch.text)
+          .once()
+          .then((event) {
+        setState(() {
+          if (event.snapshot.value != null) {
+            orderList.clearList();
+            final json = event.snapshot.value as Map<dynamic, dynamic>;
+            orders = Orders.fromJson(json);
+            orderList.addOrderItem(
+              orders.orderId,
+              orders.state,
+              orders.totalCall,
+              orders.name,
+              orders.email,
+              orders.phone,
+              orders.date,
+              orders.orderStatus,
+              orders.confirmationStatus,
+              orders.call1EmpName,
+              orders.call1Note,
+              orders.call1DateTime,
+              orders.call2EmpName,
+              orders.call2Note,
+              orders.call2DateTime,
+              orders.call3EmpName,
+              orders.call3Note,
+              orders.call3DateTime,
+            );
+
+            orderItemList = orderList.getOrderList;
+
+            setState(() {
+              isShowing = false;
+            });
+          } else {
+            setState(() {
+              _isGetData = false;
+            });
+          }
+        });
+      });
+    } else {
+      FirebaseDatabase.instance.ref('orderlist').once().then((event) {
+        setState(() {
+          if (event.snapshot.value != null) {
+            orderList.clearList();
+            final response = event.snapshot.value as Map<dynamic, dynamic>;
+            response.forEach((orderId, orderData) {
+              final json = orderData as Map<dynamic, dynamic>;
+              orders = Orders.fromJson(json);
+              orderList.addOrderItem(
+                orders.orderId,
+                orders.state,
+                orders.totalCall,
+                orders.name,
+                orders.email,
+                orders.phone,
+                orders.date,
+                orders.orderStatus,
+                orders.confirmationStatus,
+                orders.call1EmpName,
+                orders.call1Note,
+                orders.call1DateTime,
+                orders.call2EmpName,
+                orders.call2Note,
+                orders.call2DateTime,
+                orders.call3EmpName,
+                orders.call3Note,
+                orders.call3DateTime,
+              );
+            });
+            orderItemList = orderList.getOrderList;
+
+            setState(() {
+              isShowing = false;
+            });
+          }
+        });
+      });
+    }
   }
 
   @override
@@ -61,7 +162,6 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 children: [
                   Container(
-                    // height: 80,
                     width: 280,
                     child: TextField(
                       controller: _controllerSearch,
@@ -69,12 +169,36 @@ class _HomeScreenState extends State<HomeScreen> {
                         setState(() {
                           _controllerSearch.text = value;
                         });
+                        if (_controllerSearch.text == '') {
+                          setState(() {
+                            _showOnly = false;
+                            _isGetData = true;
+                          });
+                          _readDB();
+                        }
                       },
                       decoration: InputDecoration(
                         floatingLabelBehavior: FloatingLabelBehavior.never,
                         filled: true,
                         fillColor: Colors.white,
                         prefixIcon: Icon(Icons.search),
+                        suffixIcon: _controllerSearch.text.isEmpty
+                            ? null
+                            : IconButton(
+                                icon: Icon(Icons.close),
+                                onPressed: () {
+                                  setState(() {
+                                    _controllerSearch.clear();
+                                  });
+                                  if (_controllerSearch.text == '') {
+                                    setState(() {
+                                      _showOnly = false;
+                                      _isGetData = true;
+                                    });
+                                    _readDB();
+                                  }
+                                },
+                              ),
                         label: Text('Search'),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.all(
@@ -108,9 +232,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       } else {
                         setState(() {
                           _showOnly = true;
+                          _isGetData = true;
                         });
-                        print(_showOnly);
-                        print('object---' + _controllerSearch.text);
+                        _readDB();
                       }
                     },
                     style: ButtonStyle(
@@ -136,37 +260,36 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      body: FirebaseAnimatedList(
-        query: _showOnly ? getSearchedListQuery() : getOrderListQuery(),
-        itemBuilder: (context, snapshot, animation, index) {
-          final json = snapshot.value as Map<dynamic, dynamic>;
-          final orders = Orders.fromJson(json);
-          print(TAG + ' controller text ' + _controllerSearch.text);
-          if (_controllerSearch.text != '') {
-            var justTry = databaseRef.child(_controllerSearch.text);
-            justTry.once().then(
-                  (event) => print(TAG +
-                      ' --Firebase Single Search-- ' +
-                      event.snapshot.value.toString()),
-                );
-            print('query ----$justTry');
-          }
-
-          return GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: ((context) => ListItemDetailScreen(
-                        orderData: orders,
-                        orderKey: orders.orderId,
-                      )),
+      body: isShowing
+          ? Center(child: CircularProgressIndicator())
+          : _isGetData
+              ? ListView.builder(
+                  itemCount: orderItemList.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      child: GestureDetector(
+                          child: SingleListItem(orders: orderItemList[index]),
+                          onTap: () {
+                            Navigator.of(context)
+                                .push(
+                                  MaterialPageRoute(
+                                    builder: ((context) => ListItemDetailScreen(
+                                          orderData: orderItemList[index],
+                                          orderKey:
+                                              orderItemList[index].orderId,
+                                        )),
+                                  ),
+                                )
+                                .then((value) => _readDB());
+                          }),
+                    );
+                  },
+                )
+              : Container(
+                  child: Center(
+                    child: Text('Enter Valid Order Id'),
+                  ),
                 ),
-              );
-            },
-            child: SingleListItem(orders: orders),
-          );
-        },
-      ),
     );
   }
 }
@@ -177,7 +300,7 @@ class SingleListItem extends StatelessWidget {
     required this.orders,
   }) : super(key: key);
 
-  final Orders orders;
+  final OrderItem orders;
 
   @override
   Widget build(BuildContext context) {
